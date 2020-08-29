@@ -1,0 +1,6 @@
+{
+    "port": 3002,
+    "jwtSecret": "SecretKey",
+    "mongoUri": "mongodb+srv://admin:admin@phone-store-cluster.eaf96.mongodb.net/phone-store?retryWrites=true&w=majority",
+    "baseURL": "http://localhost:3002"
+}
