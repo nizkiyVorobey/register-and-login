@@ -6,17 +6,8 @@ const jwt = require('jsonwebtoken')
 const config = require('config');
 const router = Router();
 
-const multer = require('multer');
-const storage = multer.diskStorage({
-    destination: function(req, file, cb) {
-        cb(null, '/home/senya/work/register-login/uploadImages')
-    },
-    filename: function(req, file, cb) {
-        cb(null, file.fieldname + '-' + Date.now() + '.jpg')
-    }
-})
-const upload = multer({ storage: storage })
-
+const formidable = require('formidable');
+const fs = require('fs');
 
 router.post(
     "/login", [
@@ -63,54 +54,54 @@ router.post(
 
     })
 
+
 router.post(
     "/register",
-    upload.single('avatar'), [
-        body('email', 'Invalid email').isEmail(),
-        body('userName', 'Invalid email').isLength({ min: 1 }),
-        body('password', 'Invalid password').isLength({ min: 1 }),
-    ],
-    async(req, res) => {
+    (req, res) => {
+        const form = formidable({ multiples: true });
 
-        const errors = validationResult(req);
+        form.parse(req, async(err, fields, files) => {
 
-        if (!errors.isEmpty()) {
-            return res.status(400).json({
-                errors: errors.array(),
-                message: "You send invalid data"
-            })
-        } else {
-            upload.single("avatar")
-        }
+            const { email, userName, password } = fields;
 
-        const { email, userName, password } = req.body;
+            const user = await User.findOne({ $or: [{ email: email }, { userName: userName }] });
 
-        const user = await User.findOne({ $or: [{ email: email }, { userName: userName }] });
-
-        if (user) {
-            if (user.email === email) {
-                return res.status(400).json({
-                    message: "user with such email already exist "
-                })
-            } else if (user.userName === userName) {
-                return res.status(400).json({
-                    message: "user with such userName already exist "
-                })
+            if (user) {
+                if (user.email === email) {
+                    return res.status(400).json({
+                        message: "user with such email already exist "
+                    })
+                } else if (user.userName === userName) {
+                    return res.status(400).json({
+                        message: "user with such userName already exist "
+                    })
+                }
             }
-        }
 
-        const hashedPassword = await bcrypt.hash(password, 12);
+            const oldPath = files.avatar.path;
+            const newPath = "/home/senya/work/register-login/uploadImages/" + files.avatar.name
+            const rawData = await fs.readFileSync(oldPath)
 
-        const newUser = new User({
-            email,
-            userName,
-            password: hashedPassword,
-            avatar: config.get('baseURL') + '/uploadImages/' + req.file.filename
+            await fs.writeFile(newPath, rawData, function(err) {
+                if (err) console.log(err)
+                console.log("Successfully uploaded")
+            })
+
+
+            const hashedPassword = await bcrypt.hash(password, 12);
+
+            const newUser = new User({
+                email,
+                userName,
+                password: hashedPassword,
+                avatar: config.get('baseURL') + '/uploadImages/' + files.avatar.name
+            })
+
+            await newUser.save()
+
+            res.status(200).json({ user: newUser, message: "You was registered" })
+
         })
-
-        await newUser.save()
-
-        res.status(200).json({ user: newUser, message: "You was registered" })
     })
 
 
